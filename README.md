@@ -35,7 +35,7 @@ The notebook scans every image once and records its label, format, colour mode, 
 
 Total images found: **3000** · unreadable/corrupted: **0**
 
-![Number of images per class](docs/images/class_distribution_raw.png)
+![Number of images per class](class_distribution_raw.png)
 
 *Number of images per class*
 
@@ -43,7 +43,7 @@ Total images found: **3000** · unreadable/corrupted: **0**
 Balanced classes make plain accuracy meaningful; with imbalance, per-class recall and F1 would matter more.
 
 ### 4.2 Looking at the data
-![Random samples from each class](docs/images/sample_gallery.png)
+![Random samples from each class](sample_gallery.png)
 
 *Random samples from each class*
 
@@ -51,7 +51,7 @@ Balanced classes make plain accuracy meaningful; with imbalance, per-class recal
 ### 4.3 Shortcut check (size & brightness per class)
 The dataset merges several sources. If one class had been photographed with a different camera or resolution, the CNN could learn *"this looks like source X"* instead of *"this is an Aedes"*. The plots compare image size and brightness across classes.
 
-![Image size and brightness by class](docs/images/size_brightness_by_class.png)
+![Image size and brightness by class](size_brightness_by_class.png)
 
 *Image size and brightness by class*
 
@@ -87,7 +87,7 @@ If the same photo appears in both the training and test sets, the model is grade
 | test | 153 | 160 | 227 | 540 | 18.0 |
 
 ### Original vs augmented images
-![Original image (left) and random augmentations](docs/images/augmentation_examples.png)
+![Original image (left) and random augmentations](augmentation_examples.png)
 
 *Original image (left) and random augmentations*
 
@@ -100,7 +100,7 @@ Validation and test images are never augmented: they must represent real, unmodi
 
 Conv blocks learn visual patterns (edges → textures → shapes), ReLU adds non-linearity, max-pooling shrinks the maps, global average pooling reduces parameters, dropout fights overfitting, and a final linear layer outputs 3 scores.
 
-![Baseline architecture](docs/images/architecture_diagram.png)
+![Baseline architecture](architecture_diagram.png)
 
 *Baseline architecture*
 
@@ -116,7 +116,7 @@ Loss: CrossEntropy · Optimiser: Adam (lr 0.001) · Batch size 32 · Early stopp
 | exp0_no_augmentation | 93635 | 25 | 0.9473 | 0.9878 | -0.0404 | 0.0748 | baseline CNN, NO augmentation (ablation) |
 | exp1_baseline | 93635 | 30 | 0.8986 | 0.9413 | -0.0427 | 0.1597 | roadmap baseline + augmentation |
 
-![Training and validation loss/accuracy of the selected model](docs/images/training_history.png)
+![Training and validation loss/accuracy of the selected model](training_history.png)
 
 *Training and validation loss/accuracy of the selected model*
 
@@ -127,11 +127,11 @@ A large gap between training and validation accuracy indicates overfitting.
 
 ## 9. Extensions
 
-![Grad-CAM: regions that drove the prediction](docs/images/gradcam_examples.png)
+![Grad-CAM: regions that drove the prediction](gradcam_examples.png)
 
 *Grad-CAM: regions that drove the prediction*
 
-![Accuracy under simulated image degradations](docs/images/robustness.png)
+![Accuracy under simulated image degradations](robustness.png)
 
 *Accuracy under simulated image degradations*
 
