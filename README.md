@@ -1,149 +1,155 @@
 # 🦟 MosquitoVision AI
 
-**A CNN built from scratch to identify mosquito genera (Aedes · Anopheles · Culex) from photographs, to support public-health surveillance.**
+**A CNN built from scratch (PyTorch) that identifies mosquito genus — *Aedes*, *Anopheles* or *Culex* — from a photograph, to support public-health surveillance.**
 
-![Python](https://img.shields.io/badge/Python-3.10+-blue) ![PyTorch](https://img.shields.io/badge/PyTorch-CNN-red) ![Status](https://img.shields.io/badge/status-in%20progress-orange)
-
-> ⚠️ **Research prototype.** It identifies mosquito *genus* from a photo. It does **not** detect pathogens, identify exact species, or replace expert entomologists.
+> ⚠️ **Research prototype.** It identifies mosquito *genus* from an image. It does **not** detect pathogens, identify exact species, or replace expert entomologists.
 
 ---
 
-## 📌 Table of contents
-1. [Motivation](#1-motivation)
-2. [Project goal](#2-project-goal)
-3. [Dataset](#3-dataset)
-4. [Progress so far](#4-progress-so-far)
-5. [Roadmap](#5-roadmap)
-6. [Repository structure](#6-repository-structure)
-7. [How to run](#7-how-to-run)
-8. [Scientific limitations](#8-scientific-limitations)
-9. [References](#9-references)
+## 1. Why this project?
+Mosquitoes are disease vectors. *Aedes* is associated with dengue, Zika, chikungunya and yellow fever; *Anopheles* with malaria; *Culex* with West Nile virus and Japanese encephalitis. The WHO reports more than 700,000 deaths per year from vector-borne diseases.
+Identifying mosquitoes traditionally requires trained specialists examining physical features, which is slow and hard to scale. A reliable image classifier could help surveillance teams triage specimens faster, and flag the uncertain ones for experts.
 
----
-
-## 1. Motivation
-Some mosquitoes are disease vectors: *Aedes* (dengue, Zika, chikungunya, yellow fever), *Anopheles* (malaria), *Culex* (West Nile virus, Japanese encephalitis). According to the WHO, vector-borne diseases cause more than 700,000 deaths per year.
-Identifying mosquitoes traditionally needs trained specialists examining physical features under a microscope, which is slow and hard to scale. An automatic image classifier could help surveillance teams triage specimens faster.
-
-## 2. Project goal
-Train a **custom CNN (no pretrained classifier)** that takes a mosquito photo and returns:
-- the predicted genus,
-- a confidence score,
-- a short public-health context,
-- a warning when the prediction is uncertain ("expert verification recommended").
+## 2. Goal
+Train a **custom CNN (no pretrained classifier)** that takes a photo and returns the predicted genus, a confidence score, a short public-health context, and an *"uncertain — expert verification recommended"* warning when the model is not sure.
 
 ## 3. Dataset
-**MosqVision-3K** (Masud, 2024) – about 3,000 JPEG images, 3 classes, from MosquitoAlert, Mendeley Data, IEEE DataPort and Dryad.
-- Source: https://zenodo.org/records/14238701 (DOI `10.5281/zenodo.14238701`)
-- ⚠️ The dataset is **not included** in this repo. The notebook downloads it automatically. Check Zenodo's reuse terms before redistributing images.
+**MosqVision-3K** (Masud, 2024) — JPEG photos of three genera, merged from MosquitoAlert, Mendeley Data, IEEE DataPort and Dryad.
+Source: https://zenodo.org/records/14238701 · DOI `10.5281/zenodo.14238701`.
+The dataset is **not included** in this repository (the notebook downloads it automatically; check Zenodo's reuse terms before redistributing images).
 
-## 4. Progress so far
+---
 
-### ✅ Phase 0 – Environment & data download
-- Google Colab + Google Drive project structure
-- Dataset downloaded from Zenodo by code (Zenodo API with fallback URL), archive inspected *before* extraction
-- Fixed random seed (42) for reproducibility
+## 4. Phase 1 — Understanding the data (quality audit)
 
-### ✅ Phase 1 – Dataset understanding & quality audit
-Principle: *a model is only as good as its data, so the data was audited before any modelling.*
+**Principle:** a model is only as good as its data, so the data was audited *before* any modelling.
 
-| Check | Why |
+The notebook scans every image once and records its label, format, colour mode, width, height, brightness, an MD5 fingerprint (finds exact copies) and a 64-bit **perceptual hash** (finds near-identical images).
+
+### 4.1 Class balance
+| label | images | percent |
+|---|---|---|
+| Aedes | 1000 | 33.3 |
+| Anopheles | 1000 | 33.3 |
+| Culex | 1000 | 33.3 |
+
+Total images found: **3000** · unreadable/corrupted: **0**
+
+![Number of images per class](docs/images/class_distribution_raw.png)
+
+*Number of images per class*
+
+
+Balanced classes make plain accuracy meaningful; with imbalance, per-class recall and F1 would matter more.
+
+### 4.2 Looking at the data
+![Random samples from each class](docs/images/sample_gallery.png)
+
+*Random samples from each class*
+
+
+### 4.3 Shortcut check (size & brightness per class)
+The dataset merges several sources. If one class had been photographed with a different camera or resolution, the CNN could learn *"this looks like source X"* instead of *"this is an Aedes"*. The plots compare image size and brightness across classes.
+
+![Image size and brightness by class](docs/images/size_brightness_by_class.png)
+
+*Image size and brightness by class*
+
+
+### 4.4 Duplicates and label conflicts
+If the same photo appears in both the training and test sets, the model is graded on something it has already memorised and the accuracy is fake. Exact copies are found with MD5; near-copies with a perceptual hash (Hamming distance ≤ 4 of 64 bits). Duplicates are merged into *clusters*.
+
+| Check | Result |
 |---|---|
-| Images per class | Is the dataset balanced? |
-| Sample gallery | Look at the data with human eyes |
-| Corrupted / tiny files | Prevent crashes and useless inputs |
-| Size, format, brightness per class | Detect *shortcuts* (e.g. one class from a different camera) |
-| Exact duplicates (MD5) + near-duplicates (perceptual hash) | Prevent train/test leakage |
-| Same image under two labels | Detect labelling errors |
+| Exact duplicate files | **1919** |
+| Redundant exact + near-duplicate images | **1923** |
+| Images in clusters with conflicting labels (removed) | **0** |
 
-**Class distribution**
+---
 
-![Class distribution](docs/images/class_distribution_raw.png)
-
-**Sample images**
-
-![Sample gallery](docs/images/sample_gallery.png)
-
-**Image size & brightness per class (shortcut check)**
-
-![Size and brightness](docs/images/size_brightness_by_class.png)
-
-**Key numbers** *(fill in from your own run – `results/dataset_summary.txt`)*
-
-| Item | Value |
-|---|---|
-| Total images | `...` |
-| Unreadable images | `...` |
-| Exact duplicates | `...` |
-| Redundant near-duplicates | `...` |
-| Images with conflicting labels (removed) | `...` |
-
-**What I observed:** `...` *(write 2–3 sentences about the gallery, class balance and any shortcut you noticed)*
-
-### ✅ Phase 2 – Preprocessing & leak-free split
+## 5. Phase 2 — Preprocessing and leak-free split
 
 | Step | What | Why |
 |---|---|---|
-| Resize | 128 × 128 × 3 | CNN needs fixed input size; keeps training light |
-| Normalise | pixel / 255 → [0, 1] | stabler training |
-| Label encoding | Aedes 0 · Anopheles 1 · Culex 2 | networks use numbers |
-| Split | 70 % train / 15 % val / 15 % test | train, tune, final honest evaluation |
-| Split method | **Stratified + group-aware** | classes stay balanced, near-duplicates never cross splits |
-| Verification | assertions on cluster IDs and MD5 hashes | code fails if any leak exists |
-| Augmentation | flips, ±15° rotation, small crops, brightness/contrast | reduces memorisation – **train only, after the split** |
+| Resize | 128×128×3 (49,152 numbers per image) | the CNN needs a fixed input size; keeps training light |
+| Normalise | pixel / 255 → [0, 1] | smaller, consistent numbers make training stabler |
+| Label encoding | Aedes 0 · Anopheles 1 · Culex 2 | networks work with numbers |
+| Split | 70 % train / 15 % val / 15 % test | train, tune, and a final honest exam |
+| Split method | **stratified + duplicate-aware** | class proportions preserved; near-duplicates never cross splits |
+| Verification | assertions on cluster IDs and MD5 hashes | the code stops if any leak exists |
+| Augmentation | flips, ±15° rotation, small crops, brightness/contrast | reduces memorisation — **train only, after the split** |
 
-**Split sizes** *(fill in from `results/split_table.csv`)*
+### Split sizes
+| split | Aedes | Anopheles | Culex | total | share_% |
+|---|---|---|---|---|---|
+| train | 715 | 685 | 651 | 2051 | 68.4 |
+| val | 132 | 155 | 122 | 409 | 13.6 |
+| test | 153 | 160 | 227 | 540 | 18.0 |
 
-| Split | Aedes | Anopheles | Culex | Total |
-|---|---|---|---|---|
-| Train | | | | |
-| Validation | | | | |
-| Test | | | | |
+### Original vs augmented images
+![Original image (left) and random augmentations](docs/images/augmentation_examples.png)
 
-**Original vs augmented images**
+*Original image (left) and random augmentations*
 
-![Augmentation](docs/images/augmentation_examples.png)
 
-## 5. Roadmap
+Validation and test images are never augmented: they must represent real, unmodified photos.
 
-| Phase | Description | Status |
-|---|---|---|
-| 0 | Setup & data download | ✅ Done |
-| 1 | Data exploration & quality audit | ✅ Done |
-| 2 | Preprocessing & leak-free split | ✅ Done |
-| 3 | Custom CNN in PyTorch | 🔄 In progress |
-| 4 | Training, overfitting analysis, improvements | ⏳ Planned |
-| 5 | Scientific evaluation (precision, recall, F1, confusion matrix, error analysis) | ⏳ Planned |
-| 6 | Streamlit application with uncertainty warning | ⏳ Planned |
-| Ext. | Grad-CAM · pretrained benchmark · robustness test | ⏳ Optional |
+---
 
-**Planned CNN architecture:** 3 × [Conv 3×3 → ReLU → MaxPool] (32 → 64 → 128 filters) → Global Average Pooling → Dropout → Linear(3).
+## 6. Phase 3 — The CNN (built from scratch)
 
-## 6. Repository structure
-```
-MosquitoVision/
-├── notebooks/MosquitoVision_AI.ipynb   # full pipeline
-├── docs/images/                        # figures used in this README
-├── results/                            # plots, reports (added as phases finish)
-├── models/                             # trained weights (Phase 4+)
-├── app/                                # Streamlit app (Phase 6)
-├── requirements.txt
-└── README.md
-```
+Conv blocks learn visual patterns (edges → textures → shapes), ReLU adds non-linearity, max-pooling shrinks the maps, global average pooling reduces parameters, dropout fights overfitting, and a final linear layer outputs 3 scores.
 
-## 7. How to run
-1. Open `notebooks/MosquitoVision_AI.ipynb` in **Google Colab** (Runtime → T4 GPU).
-2. Run the cells from top to bottom. Phase 0 mounts Google Drive and downloads the dataset automatically.
+![Baseline architecture](docs/images/architecture_diagram.png)
 
-## 8. Scientific limitations
+*Baseline architecture*
+
+
+---
+
+## 7. Phase 4 — Training and improvement
+
+Loss: CrossEntropy · Optimiser: Adam (lr 0.001) · Batch size 32 · Early stopping + best-validation checkpoint. Several experiments were compared on **validation** data only (the test set stayed untouched).
+
+| name | params | best_epoch | train_acc_at_best | val_acc_at_best | train_val_gap | best_val_loss | notes |
+|---|---|---|---|---|---|---|---|
+| exp0_no_augmentation | 93635 | 25 | 0.9473 | 0.9878 | -0.0404 | 0.0748 | baseline CNN, NO augmentation (ablation) |
+| exp1_baseline | 93635 | 30 | 0.8986 | 0.9413 | -0.0427 | 0.1597 | roadmap baseline + augmentation |
+
+![Training and validation loss/accuracy of the selected model](docs/images/training_history.png)
+
+*Training and validation loss/accuracy of the selected model*
+
+
+A large gap between training and validation accuracy indicates overfitting.
+
+---
+
+## 9. Extensions
+
+![Grad-CAM: regions that drove the prediction](docs/images/gradcam_examples.png)
+
+*Grad-CAM: regions that drove the prediction*
+
+![Accuracy under simulated image degradations](docs/images/robustness.png)
+
+*Accuracy under simulated image degradations*
+
+
+---
+
+## Scientific limitations
 1. Mosquito identification is **not** pathogen detection.
 2. Labels are **genus-level**, not species-level.
-3. A prediction is **not** a confirmed identification: experts must verify uncertain cases.
+3. A prediction is **not** a confirmed identification; experts must verify uncertain cases.
 4. The dataset is multi-source and **not representative of Moroccan mosquito populations**.
-5. Good test accuracy would **not** prove real-world effectiveness (different cameras, backgrounds and lighting must be tested).
+5. Good test accuracy does **not** prove real-world effectiveness (other cameras, backgrounds and lighting must be tested).
 
-## 9. References
-1. WHO – *Vector-borne diseases* fact sheet. https://www.who.int/en/news-room/fact-sheets/detail/vector-borne-diseases
-2. Pise et al. (2022) – *Dataset of Vector Mosquito Images*, Data in Brief. https://doi.org/10.1016/j.dib.2022.108573
-3. Masud (2024) – *MosqVision-3K*, Zenodo. https://zenodo.org/records/14238701
-4. Nolte et al. (2024) – *Robust mosquito species identification from diverse body and wing images using deep learning*, Parasites & Vectors. https://doi.org/10.1186/s13071-024-06459-3
+## How to run
+Open `MosquitoVision_AI.ipynb` in Google Colab (Runtime → T4 GPU) and run the cells top to bottom. The dataset downloads automatically.
+
+## References
+1. WHO — *Vector-borne diseases* fact sheet. https://www.who.int/en/news-room/fact-sheets/detail/vector-borne-diseases
+2. Pise et al. (2022) — *Dataset of Vector Mosquito Images*, Data in Brief. https://doi.org/10.1016/j.dib.2022.108573
+3. Masud (2024) — *MosqVision-3K*, Zenodo. https://zenodo.org/records/14238701
+4. Nolte et al. (2024) — *Robust mosquito species identification from diverse body and wing images using deep learning*, Parasites & Vectors. https://doi.org/10.1186/s13071-024-06459-3
